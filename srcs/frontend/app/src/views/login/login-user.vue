@@ -107,7 +107,7 @@ import jwtDecode from 'jwt-decode';
 import router from '@/router';
 
 
-const enable_user_password = false
+const enable_user_password = true
 // Desestructuración de las variables y funciones desde useAuth
 const { 
   email, 
