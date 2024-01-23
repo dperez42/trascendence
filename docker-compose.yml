@@ -1,0 +1,94 @@
+version: '3.7'
+
+networks:
+  transcendence_network:
+
+services:
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: postgres-db
+    env_file:
+      - ./srcs/database/database.env
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      TZ: "Europe/Madrid"
+    volumes:
+      - ./srcs/database/data:/var/lib/postgresql/data
+      - ./srcs/database/init_db.sql:/docker-entrypoint-initdb.d/create_db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - transcendence_network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest 
+    container_name: postgres-admin
+    restart: always
+    ports:
+      - 5050:80
+    environment:
+      TZ: "Europe/Madrid"
+    logging:
+      driver: json-file
+    env_file:
+      - ./srcs/pgadmin/pgadmin.env
+    volumes:
+      - ./srcs/pgadmin/pgadmin_servers.json:/pgadmin4/servers.json
+    depends_on:
+      - postgres-db
+    networks:
+      - transcendence_network
+
+  backend:
+    hostname: backend
+    build:
+      context: ./srcs/backend
+      # ✨ Target the dev stage
+      target: 'develop'                 # develop
+      #target: production               # production
+      dockerfile: backend.dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./srcs/backend/backend.env
+    volumes:
+      - ./srcs/backend/app:/app   # develop, comment line in target=production
+      - /app/node_modules
+    # healthcheck:
+    #   test: ["CMD", "wget", "localhost:3000/api -q -O - > /dev/null 2>&1"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 5
+    depends_on:
+      - postgres-db
+    ports:
+      - 3000:3000
+    networks:
+      - transcendence_network
+
+  frontend:
+    hostname: frontend
+    build:
+      context: ./srcs/frontend
+      dockerfile: frontend.dockerfile
+      target: 'develop'                # develop
+      #target: 'production'              # production
+    restart: unless-stopped
+    command: /bin/sh -c "npm run serve"  # develop, comment line in target=production
+    env_file:
+      - ./srcs/frontend/frontend.env
+    volumes:
+      - ./srcs/frontend/app:/app            # develop, comment line in target=production
+      - /app/node_modules              # develop, comment line in target=production
+    ports:
+      - 8080:8080                         # production
+    networks:
+      - transcendence_network
+
+volumes:
+  postgres-data:
+
